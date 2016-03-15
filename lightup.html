@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Minneapolis Stormwater</title>
+  <meta charset="utf-8" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.css" />
+
+  <style>
+    #map {
+      width: 800px;
+      height: 600px;
+    }
+
+    .info {
+      padding: 6px 8px;
+      font: 14px/16px Arial, Helvetica, sans-serif;
+      background: white;
+      background: rgba(255,255,255,0.8);
+      box-shadow: 0 0 15px rgba(0,0,0,0.2);
+      border-radius: 5px;
+    }
+    .info h4 {
+      margin: 0 0 5px;
+      color: #777;
+    }
+
+    .legend {
+      text-align: left;
+      line-height: 18px;
+      color: #555;
+    }
+    .legend i {
+      width: 18px;
+      height: 18px;
+      float: left;
+      margin-right: 8px;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script src="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.js"></script>
+
+  <script type="text/javascript" src="us-states.js"></script>
+  <script type="text/javascript" src="sheds.json"></script>
+  <script type="text/javascript" src="water.json"></script>
+  <script type="text/javascript">
+
+    var map = L.map('map').setView([44.95, -93.25], 12);
+
+    L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoiZmxhdGxhbmRtYXBzIiwiYSI6IldOSXVCWWMifQ.HhYmSncMHxdF_TGZbXo9sQ', {
+      maxZoom: 20,
+      attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, ' +
+        '<a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
+        'Imagery © <a href="http://mapbox.com">Mapbox</a>',
+      id: 'mapbox.light'
+    }).addTo(map);
+
+
+    // control that shows state info on hover
+    var info = L.control();
+
+    info.onAdd = function (map) {
+      this._div = L.DomUtil.create('div', 'info');
+      this.update();
+      return this._div;
+    };
+
+
+    info.update = function (props) {
+      this._div.innerHTML = '<h4>Stormwater Shed</h4>' +  (props ?
+        '<b>' + props.OUTFALL_ID + '</b><br />'
+        : 'Hover over an area');
+    };
+
+    info.addTo(map);
+
+
+    function shedStyle(feature) {
+      return {
+        weight: 2,
+        opacity: 1,
+        color: '#BD0026',
+        //dashArray: '3',
+        fillOpacity: 0.3,
+        fillColor: '#FED976'
+      };
+    }
+
+		function waterStyle(feature) {
+      return {
+        weight: 2,
+        color: '#90DAFF',
+        fillOpacity: 0.7
+      };
+    }
+
+		function highlightWater(wid) {
+		var wwid = wid;
+
+			hydrojson.eachLayer(function(layer){
+				var id = layer._leaflet_id;
+				var waterid = layer.feature.properties.OBJECTID
+
+				if (waterid === wwid) {
+			  map._layers[id].setStyle({fillColor: '#41C0FF'});
+			}
+			});
+		}
+
+		function resetWater(wid) {
+		var wwid = wid;
+
+			hydrojson.eachLayer(function(layer){
+				var id = layer._leaflet_id;
+				var waterid = layer.feature.properties.OBJECTID
+
+				if (waterid === wwid) {
+				map._layers[id].setStyle({
+                                  fillColor: '#ADE4FF'
+
+                                 });
+			                        }
+			    });
+		}
+
+
+    function highlightFeature(e) {
+      var layer = e.target;
+
+      layer.setStyle({
+        weight: 2,
+        color: '#666',
+        dashArray: '',
+        fillOpacity: 0.7
+      });
+
+			highlightWater(layer.feature.properties.wbid);
+
+      if (!L.Browser.ie && !L.Browser.opera) {
+        layer.bringToFront();
+      }
+
+      info.update(layer.feature.properties);
+    }
+
+    var geojson;
+
+    function resetHighlight(e) {
+			var layer = e.target;
+      geojson.resetStyle(layer);
+			resetWater(layer.feature.properties.wbid);
+      info.update();
+    }
+
+    function zoomToFeature(e) {
+      map.fitBounds(e.target.getBounds());
+    }
+
+    function onEachFeature(feature, layer) {
+      layer.on({
+        mouseover: highlightFeature,
+        mouseout: resetHighlight,
+        click: zoomToFeature
+      });
+    }
+
+    function onEachWaterFeature(feature, layer) {
+
+      layer._polygon_id = feature.OBJECTID;
+    }
+
+    geojson = L.geoJson(shedsData, {
+      style: shedStyle,
+      onEachFeature: onEachFeature
+    }).addTo(map);
+
+    hydrojson = L.geoJson(waterData, {
+      style: waterStyle,
+      onEachFeature: onEachWaterFeature
+    }).addTo(map);
+
+  </script>
+</body>
+</html>
